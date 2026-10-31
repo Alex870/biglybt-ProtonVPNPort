@@ -15,6 +15,7 @@ Where v0.1.0 differs from or adds to the text below:
 - **What gets compared (§4.6).** The NAT-PMP **TCP** port is compared with the log (UDP is used if TCP failed). Differing TCP and UDP ports are counted separately as `TCP_UDP_SPLIT`, not as their own outcome.
 - **Logging settings (§4.5).** The old `debug_level` setting is no longer registered. `verbose` takes its default from the old `debug` value.
 - **Project layout (§4.1).** `Eclipse_Project/` keeps its name, but it now uses the standard Maven layout inside (`src/main/resources`, `src/test/java`). Moving it to the repo root is still planned for v0.2.0.
+- **GitHub Releases** (planned for v0.2.0) were adopted in v0.1.0. The jar is no longer committed; see `docs/RELEASING.md`.
 - **Unload.** The plugin implements `UnloadablePlugin`, so its timer and UI are cleaned up on unload.
 
 This document covers what changes in the plugin, why, and in what order. It
@@ -112,7 +113,7 @@ The sections below describe each version in detail.
 | `pom.xml` has no BiglyBT dependency, so `mvn package` can't compile | Add a `provided`-scope dependency on the BiglyBT core jar (see below) |
 | `pom.xml` targets `<release>24</release>`, but the shipped jar is Java 8 | Change to `<release>8</release>` |
 | Versions disagree (`0.0.1-SNAPSHOT` vs `0.0.2`) | The pom becomes the single source. Generate `plugin.properties` from it with Maven resource filtering (`plugin.version=${project.version}`) |
-| Release jar committed under `Release/` | Keep it for this release (the README links to it). From v0.2.0, publish to GitHub Releases |
+| Release jar committed under `Release/` | **Done in v0.1.0 (brought forward from v0.2.0):** jars are published as GitHub Releases. `Release/` holds only a pointer README. The process is in `docs/RELEASING.md` |
 | README typos ("reconfigues", "repositiory") | Fix |
 
 **BiglyBT dependency.** As far as we know, BiglyBT doesn't publish its core to
@@ -325,8 +326,7 @@ attention.
 
 | Item | Design |
 |---|---|
-| **CI** | GitHub Actions. On push/PR: `mvn -B verify` on JDK 8 and 21, with the BiglyBT jar fetched from a pinned BiglyBT GitHub release asset (or cached). On a `v*` tag: build and attach the jar to a GitHub Release |
-| **Release distribution** | Stop committing jars to `Release/`. The README links to the latest GitHub Release |
+| **CI** | GitHub Actions. On push/PR: `mvn -B verify` on JDK 8 and 21, with the BiglyBT jar fetched from a pinned BiglyBT GitHub release asset (or cached). On a `v*` tag: build the jar and attach it to a draft GitHub Release, which automates steps 3 and 5 of `docs/RELEASING.md` |
 | **Package rename** | `org.biglybt.plugin.protonvpn` → `io.github.alex870.protonport`, so it doesn't look like it's in BiglyBT's namespace. `plugin.id=protonport` and all config keys stay the same, so user settings carry over. Only `plugin.class` / `plugin.langfile` change |
 | **Stale-port handling** | Use the trial data. If `LOG_ONLY` / `NEITHER` reliably show the VPN is down, add an *optional* "VPN appears down" status and warning (still no automatic port change). Also check, with `NetworkInterface`, for a local address in the gateway's /16 as a cheap "connected" hint |
 | **Restore original port** | Optional setting. When the plugin first changes the port, it saves the original. On disable or shutdown (`UnloadablePlugin.unload` / closedown listener), it puts the original back |
