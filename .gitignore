@@ -1,0 +1,18 @@
+# Build output
+target/
+*.class
+
+# Local BiglyBT jar used for compiling (see README developer notes)
+Eclipse_Project/lib/
+
+# IDE files
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

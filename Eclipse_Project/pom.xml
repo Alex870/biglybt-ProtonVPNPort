@@ -1,14 +1,55 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>ProtonVpnPortConfig</groupId>
-  <artifactId>ProtonVpnPortConfig</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+
+  <groupId>io.github.alex870</groupId>
+  <artifactId>protonport</artifactId>
+  <!-- Single source of truth for the plugin version: copied into plugin.properties at build time. -->
+  <version>0.1.1</version>
+  <name>BiglyBT Proton VPN Port Auto-Config</name>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!--
+      BiglyBT is not published to Maven Central. Point this at the BiglyBT.jar from a
+      BiglyBT install, either by copying it to lib/BiglyBT.jar or by passing
+      -Dbiglybt.jar=/path/to/BiglyBT.jar on the command line.
+    -->
+    <biglybt.jar>${project.basedir}/lib/BiglyBT.jar</biglybt.jar>
+    <junit.version>5.10.2</junit.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.biglybt</groupId>
+      <artifactId>biglybt-core</artifactId>
+      <version>local</version>
+      <scope>system</scope>
+      <systemPath>${biglybt.jar}</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
   <build>
+    <!-- Produces target/ProtonVPN_<version>.jar, installable via Tools -> Plugins -> Install from file -->
+    <finalName>ProtonVPN_${project.version}</finalName>
     <resources>
       <resource>
-        <directory>src/main/java</directory>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+        <includes>
+          <include>plugin.properties</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
         <excludes>
-          <exclude>**/*.java</exclude>
+          <exclude>plugin.properties</exclude>
         </excludes>
       </resource>
     </resources>
@@ -17,20 +58,26 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
         <configuration>
-          <release>24</release>
+          <!-- Java 8 bytecode, matching the oldest Java runtime BiglyBT supports -->
+          <release>8</release>
+          <compilerArgs>
+            <arg>-Xlint:-options</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.1</version>
+        <configuration>
+          <archive>
+            <addMavenDescriptor>false</addMavenDescriptor>
+          </archive>
         </configuration>
       </plugin>
     </plugins>
   </build>
-
-<!--  
-	<dependencies>
-		<dependency>
-			<groupId>org.xerial</groupId>
-        	<artifactId>sqlite-jdbc</artifactId>
-        	<version>3.45.1.0</version>  
-    	</dependency>
-	</dependencies>
--->
-  
 </project>
