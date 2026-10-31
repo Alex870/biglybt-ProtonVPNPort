@@ -1,6 +1,21 @@
 # ProtonVPNPort — Design & Roadmap
 
-Status: Draft · Applies to: plugin v0.0.2 → v1.0
+Status: v0.1.0 implemented · Applies to: plugin v0.0.2 → v1.0
+
+## Implementation status
+
+| Version | State |
+|---|---|
+| v0.1.0 | **Implemented** (unit-tested; not yet tested in a live BiglyBT + Proton VPN setup) |
+| v0.2.0 – v1.0.0 | Not started |
+
+Where v0.1.0 differs from or adds to the text below:
+- **Forced re-read (§4.3, point 2).** Even when the size and modified time look unchanged, the log is re-copied at least every 5 minutes. Windows can report stale size and time for a file another process holds open, so an unchanged-looking file isn't proof that it is unchanged.
+- **`UNCHANGED` (§2).** This kind is only returned when the cached result had a port. An unchanged file with no port keeps returning `NOT_FOUND`, without copying it again.
+- **What gets compared (§4.6).** The NAT-PMP **TCP** port is compared with the log (UDP is used if TCP failed). Differing TCP and UDP ports are counted separately as `TCP_UDP_SPLIT`, not as their own outcome.
+- **Logging settings (§4.5).** The old `debug_level` setting is no longer registered. `verbose` takes its default from the old `debug` value.
+- **Project layout (§4.1).** `Eclipse_Project/` keeps its name, but it now uses the standard Maven layout inside (`src/main/resources`, `src/test/java`). Moving it to the repo root is still planned for v0.2.0.
+- **Unload.** The plugin implements `UnloadablePlugin`, so its timer and UI are cleaned up on unload.
 
 This document covers what changes in the plugin, why, and in what order. It
 builds on the review of v0.0.2 and on these decisions from the project owner:
