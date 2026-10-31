@@ -164,7 +164,7 @@ public class PortConfig implements UnloadablePlugin {
 					+ "so earlier results are not comparable");
 		}
 		check.refreshTrialSummary();
-		log.info("Proton Port Auto-Config loaded (" + LogLocator.detectOs(System.getProperty("os.name")) + "); "
+		log.info("Proton Port Auto-Config " + pi.getPluginVersion() + " loaded (" + LogLocator.detectOs(System.getProperty("os.name")) + "); "
 				+ (enable.getValue() ? "enabled" : "disabled") + ", checking every " + checkSecs.getValue() + " s"
 				+ (natEnable.getValue() ? "; NAT-PMP trial on (gateway " + natGateway.getValue() + ", results in " + trialFile + ")" : ""));
 

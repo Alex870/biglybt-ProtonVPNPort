@@ -15,6 +15,7 @@ Where v0.1.0 differs from or adds to the text below:
 - **What gets compared (§4.6).** The NAT-PMP **TCP** port is compared with the log (UDP is used if TCP failed). Differing TCP and UDP ports are counted separately as `TCP_UDP_SPLIT`, not as their own outcome.
 - **Logging settings (§4.5).** The old `debug_level` setting is no longer registered. `verbose` takes its default from the old `debug` value.
 - **Project layout (§4.1).** `Eclipse_Project/` keeps its name, but it now uses the standard Maven layout inside (`src/main/resources`, `src/test/java`). Moving it to the repo root is still planned for v0.2.0.
+- **Version number.** The v0.1.0 milestone is released as plugin version **0.1.1**. The first test build carried 0.1.0, and BiglyBT won't install a rebuilt jar over the same version number.
 - **GitHub Releases** (planned for v0.2.0) were adopted in v0.1.0. The jar is no longer committed; see `docs/RELEASING.md`.
 - **NAT-PMP trial request (§4.6).** Revised after the first live test: the trial asks about the app's mapping (internal and suggested port = log port, 60 s) instead of creating a new one, and skips checks with no log port. Counters reset on the schema change, and the trial file is now `natpmp-trial-v2.csv`.
 - **Unload.** The plugin implements `UnloadablePlugin`, so its timer and UI are cleaned up on unload.

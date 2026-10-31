@@ -23,6 +23,7 @@ Release states:
 ## Steps
 
 1. **Set the version.** Change `<version>` in `Eclipse_Project/pom.xml` (e.g. `0.1.1`). That's the only place the version lives; `plugin.properties` takes it from the pom at build time.
+   **Bump it for every build you install, including test builds.** BiglyBT refuses to install a plugin whose version is already installed ("Version … is already installed"), so a rebuilt jar with the same number never replaces the old one. The plugin log's first line ("Proton Port Auto-Config <version> loaded") shows which version is running.
 2. **Merge to `main`.** Release from `main`, so the tag points at code everyone can see.
 3. **Build the jar:**
    ```bash

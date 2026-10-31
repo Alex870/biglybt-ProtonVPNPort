@@ -11,7 +11,7 @@ This plugin for BiglyBT (formerly Azureus, Vuze) reads the latest port number li
 
 It is primarily a Windows solution: it finds the Proton VPN client's log in its standard install location. On Linux and macOS it searches likely log locations, but those locations and log formats are unverified. You can always set the log path manually.
 
-Since 0.1.0 the plugin also runs an experimental **NAT-PMP comparison trial**. It asks Proton's VPN gateway directly about the port the Proton app is forwarding and records whether the gateway confirms the port in the log. The log remains the source of truth, and NAT-PMP results never change BiglyBT's settings. The trial checks that the plugin can talk to Proton's gateway reliably. That's the groundwork for a future mode for setups without the Proton app (for example Linux with WireGuard), where the plugin would manage the port forward itself. See [docs/DESIGN.md](docs/DESIGN.md).
+Since 0.1.1 the plugin also runs an experimental **NAT-PMP comparison trial**. It asks Proton's VPN gateway directly about the port the Proton app is forwarding and records whether the gateway confirms the port in the log. The log remains the source of truth, and NAT-PMP results never change BiglyBT's settings. The trial checks that the plugin can talk to Proton's gateway reliably. That's the groundwork for a future mode for setups without the Proton app (for example Linux with WireGuard), where the plugin would manage the port forward itself. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ------------
 
@@ -23,7 +23,7 @@ Since 0.1.0 the plugin also runs an experimental **NAT-PMP comparison trial**. I
 1. Open the latest release page: **[Download the latest release](https://github.com/Alex870/biglybt-ProtonVPNPort/releases/latest)**
    (You can also reach it from the repository's front page: on the right-hand side, under **Releases**, click the version marked **Latest**.)
 2. Scroll down to the **Assets** section at the bottom of the release.
-3. Click the file named **`ProtonVPN_x.x.x.jar`** (for example `ProtonVPN_0.1.0.jar`) to download it.
+3. Click the file named **`ProtonVPN_x.x.x.jar`** (for example `ProtonVPN_0.1.1.jar`) to download it.
 
 > **Which file?** Only the `.jar` file. Ignore the two **Source code** downloads (`.zip` and `.tar.gz`) that GitHub adds to every release automatically. Those contain the programming files, not the plugin.
 >
