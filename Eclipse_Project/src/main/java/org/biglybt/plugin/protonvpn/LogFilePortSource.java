@@ -131,7 +131,8 @@ final class LogFilePortSource implements PortSource {
 							"Proton VPN log reports different external and internal ports (" + pair
 									+ "); using the external port " + pair.external);
 				}
-				result = PortResult.found(pair.external, "Port pair " + pair, now, elapsedMs, pathStr, mtime);
+				result = PortResult.found(pair.external, "Port pair " + pair, now, elapsedMs, pathStr, mtime)
+						.withLogEntryTime(pair.entryTimeMs);
 			}
 			log.verbose("Read " + size + " bytes from " + pathStr + " in " + elapsedMs + " ms: " + result);
 			lastPath = path;
@@ -198,6 +199,11 @@ final class LogFilePortSource implements PortSource {
 		return StandardCharsets.UTF_8.newDecoder()
 				.onMalformedInput(CodingErrorAction.REPLACE)
 				.onUnmappableCharacter(CodingErrorAction.REPLACE);
+	}
+
+	/** Forces the next query to copy and re-read the log even if it looks unchanged. */
+	synchronized void invalidateCache() {
+		forget();
 	}
 
 	/** Number of copy retries since load (a measure of lock contention on the log). */

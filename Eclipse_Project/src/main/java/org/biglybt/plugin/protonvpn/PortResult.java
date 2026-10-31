@@ -29,6 +29,8 @@ final class PortResult {
 	final String sourcePath;
 	/** Last-modified time of the source file (epoch ms), or -1. */
 	final long sourceMtimeMs;
+	/** Log only: time the log line holding the port was written (epoch ms), or -1. */
+	final long logEntryTimeMs;
 	/** NAT-PMP only: internal port echoed by the gateway, or -1. */
 	final int gatewayInternalPort;
 	/** NAT-PMP only: mapping lifetime granted by the gateway (s), or -1. */
@@ -38,12 +40,12 @@ final class PortResult {
 
 	private PortResult(Kind kind, Integer tcpPort, Integer udpPort, String detail, long timestampMs,
 			long elapsedMs, String sourcePath, long sourceMtimeMs) {
-		this(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs, -1, -1, -1);
+		this(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs, -1, -1, -1, -1);
 	}
 
 	private PortResult(Kind kind, Integer tcpPort, Integer udpPort, String detail, long timestampMs,
 			long elapsedMs, String sourcePath, long sourceMtimeMs, int gatewayInternalPort,
-			long gatewayLifetimeSecs, long gatewayEpochSecs) {
+			long gatewayLifetimeSecs, long gatewayEpochSecs, long logEntryTimeMs) {
 		this.kind = kind;
 		this.tcpPort = tcpPort;
 		this.udpPort = udpPort;
@@ -55,12 +57,19 @@ final class PortResult {
 		this.gatewayInternalPort = gatewayInternalPort;
 		this.gatewayLifetimeSecs = gatewayLifetimeSecs;
 		this.gatewayEpochSecs = gatewayEpochSecs;
+		this.logEntryTimeMs = logEntryTimeMs;
 	}
 
 	/** Returns a copy carrying the extra fields of a NAT-PMP reply. */
 	PortResult withGatewayReply(int internalPort, long lifetimeSecs, long epochSecs) {
 		return new PortResult(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs,
-				internalPort, lifetimeSecs, epochSecs);
+				internalPort, lifetimeSecs, epochSecs, logEntryTimeMs);
+	}
+
+	/** Returns a copy carrying the time the log entry was written. */
+	PortResult withLogEntryTime(long entryTimeMs) {
+		return new PortResult(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs,
+				gatewayInternalPort, gatewayLifetimeSecs, gatewayEpochSecs, entryTimeMs);
 	}
 
 	static PortResult found(int port, String detail, long now, long elapsedMs, String path, long mtime) {
@@ -73,7 +82,7 @@ final class PortResult {
 
 	static PortResult unchanged(PortResult cached, long now) {
 		return new PortResult(Kind.UNCHANGED, cached.tcpPort, cached.udpPort, cached.detail, now, 0,
-				cached.sourcePath, cached.sourceMtimeMs);
+				cached.sourcePath, cached.sourceMtimeMs).withLogEntryTime(cached.logEntryTimeMs);
 	}
 
 	static PortResult notFound(String detail, long now, String path, long mtime) {

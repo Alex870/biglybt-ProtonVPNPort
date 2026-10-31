@@ -6,7 +6,8 @@ Status: v0.1.0 implemented · Applies to: plugin v0.0.2 → v1.0
 
 | Version | State |
 |---|---|
-| v0.1.0 | **Implemented.** First live test 2026-10-31 (Windows): port detection and setting confirmed working, and the NAT-PMP trial revised as a result (§4.6.1) |
+| v0.1.0 | **Implemented.** First live test 2026-10-31 (Windows): port detection and setting confirmed working, and the NAT-PMP trial revised as a result (§4.6.1). Released as 0.1.1 |
+| 0.1.2 | **Implemented:** disagreement flagging (§4.8) |
 | v0.2.0 – v1.0.0 | Not started |
 
 Where v0.1.0 differs from or adds to the text below:
@@ -352,6 +353,34 @@ Conclusions:
 
 ---
 
+### 4.8 Disagreement flagging (0.1.2)
+
+On Windows, NAT-PMP can't find the Proton app's port by itself, only confirm a
+port it's given (§4.6.1). So the log stays the source, and NAT-PMP acts as a
+check whose disagreements are made **visible** instead of sitting in a CSV.
+
+**States** (`PortAgreement`, shown as "Port check:" in Status):
+
+| State | When | What the user sees |
+|---|---|---|
+| Agree | `MATCH` | "Agree — the VPN server confirms port P" |
+| Re-checking | First `MISMATCH` | Status shows both ports. The log cache is cleared and a check runs on the next tick (~15 s) |
+| Disagree | `MISMATCH` again on the re-check | Status shows both ports, since when and how many checks. **One BiglyBT alert per episode** (popup plus alert history), if the alert setting is on (default). Otherwise a warning in the plugin log |
+| Resolved | `MATCH` after Re-checking or Disagree | Log line "disagreement resolved after N checks" |
+| No answer | `LOG_ONLY` | Status only; no alert (could be OpenVPN, a different gateway, or the VPN going down) |
+| Off / Nothing to check | Trial off / no log port | Status only |
+
+**BiglyBT always stays on the log's port.** The likeliest cause of a lasting
+disagreement is a stale log. Then the plugin asks the gateway about an old port
+and gets back a new, non-working mapping (as with 49260 in §4.6.1), so switching
+to the NAT-PMP port would make things worse.
+
+**Which side is stale?** The parser reads each line's leading UTC timestamp
+(§4.6.1). The status and alert show the log entry's age, and call an entry older
+than 2 minutes "stale". The app logs about every 10 s while forwarding is active.
+
+Setting: `protonport.natpmp.alert` (default on), in the NAT-PMP group.
+
 ## 5. v0.2.0 — Harden and automate
 
 | Item | Design |
@@ -389,6 +418,14 @@ own mapping, as Proton's Linux instructions describe.
 
 **If not promoted:** keep NAT-PMP as a diagnostic, document the failure modes
 it showed, and treat Windows log parsing as the supported path.
+
+**Also on the roadmap: own-forward mode on Windows (tabled 2026-10-31).** With port
+forwarding turned **off** in the Proton app, the plugin would hold the session's
+forward itself. That makes NAT-PMP the true primary source on Windows too,
+independent of the log. Points to settle first:
+- Does a plugin-held mapping actually forward traffic when the app isn't holding one? Test it with an experimental setting (off by default) and canyouseeme.
+- The log can no longer cross-check the port, because the app isn't forwarding. The log check becomes a **conflict check** instead: flag it if the log shows the app's port forwarding is also active, since two forwards would compete for the session's single slot.
+- The renewal timer (every 30 s) must be stopped whenever the plugin is disabled or unloaded.
 
 ---
 

@@ -15,16 +15,18 @@ final class StatusView implements Status.Sink {
 	private final LabelParameter lastChange;
 	private final LabelParameter lastError;
 	private final LabelParameter trial;
+	private final LabelParameter portCheck;
 	private final UITextField viewStatus;
 
 	StatusView(LabelParameter logPath, LabelParameter lastCheck, LabelParameter ports, LabelParameter lastChange,
-			LabelParameter lastError, LabelParameter trial, UITextField viewStatus) {
+			LabelParameter lastError, LabelParameter trial, LabelParameter portCheck, UITextField viewStatus) {
 		this.logPath = logPath;
 		this.lastCheck = lastCheck;
 		this.ports = ports;
 		this.lastChange = lastChange;
 		this.lastError = lastError;
 		this.trial = trial;
+		this.portCheck = portCheck;
 		this.viewStatus = viewStatus;
 	}
 
@@ -38,6 +40,7 @@ final class StatusView implements Status.Sink {
 				+ " · BiglyBT TCP " + s.biglyTcp + " / UDP " + s.biglyUdp);
 		lastChange.setLabelText("Last change: " + (s.lastChangeMs > 0 ? time(s.lastChangeMs) + " — " : "") + s.lastChange);
 		lastError.setLabelText("Last error: " + (s.lastErrorMs > 0 ? time(s.lastErrorMs) + " — " : "") + s.lastError);
+		portCheck.setLabelText("Port check: " + s.portCheck);
 		trial.setLabelText("NAT-PMP trial: " + s.trialSummary);
 		if (viewStatus != null) {
 			viewStatus.setText(s.logPort == null ? "No Proton VPN port found" : "Proton VPN port " + s.logPort);

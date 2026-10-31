@@ -14,10 +14,11 @@ final class CheckScheduler {
 	static final long JITTER_ALLOWANCE_MS = 1_000;
 
 	private boolean checkedOnce = false;
+	private boolean soon = false;
 	private long lastCheckMs;
 
 	synchronized boolean isDue(long nowMs, int intervalSecs) {
-		if (!checkedOnce) {
+		if (!checkedOnce || soon) {
 			return true;
 		}
 		long intervalMs = Math.max(intervalSecs, 1) * 1000L;
@@ -26,6 +27,12 @@ final class CheckScheduler {
 
 	synchronized void markChecked(long nowMs) {
 		checkedOnce = true;
+		soon = false;
 		lastCheckMs = nowMs;
+	}
+
+	/** Makes the next tick run a check regardless of the interval (used to re-check a disagreement). */
+	synchronized void requestSoon() {
+		soon = true;
 	}
 }

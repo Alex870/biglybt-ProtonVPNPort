@@ -36,6 +36,14 @@ class LogLineParserTest {
 	}
 
 	@Test
+	void readsTheLinesUtcTimestamp() {
+		assertEquals(java.time.Instant.parse("2026-10-31T16:47:18.662Z").toEpochMilli(), LogLineParser.parseLine(LINE).entryTimeMs);
+		assertEquals(java.time.Instant.parse("2026-10-31T16:47:18.662Z").toEpochMilli(), LogLineParser.parseLine(BOM + LINE).entryTimeMs);
+		assertEquals(-1, LogLineParser.parseLine("Port pair 1->1").entryTimeMs);
+		assertEquals(-1, LogLineParser.parseLineTimestamp("2026-13-45T99:00:00Z | Port pair 1->1"));
+	}
+
+	@Test
 	void toleratesWhitespaceAroundArrow() {
 		assertEquals(new LogLineParser.PortPair(40000, 40001), LogLineParser.parseLine("x Port pair  40000 -> 40001 y"));
 		assertEquals(new LogLineParser.PortPair(40000, 40000), LogLineParser.parseLine("Port pair 40000->\t40000"));

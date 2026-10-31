@@ -14,6 +14,7 @@ final class Status {
 	long lastErrorMs;
 	String lastError = "none";
 	String trialSummary = "(no data yet)";
+	String portCheck = "(not checked yet)";
 	long copyRetries;
 	long copyFailures;
 
@@ -30,6 +31,7 @@ final class Status {
 		s.lastErrorMs = lastErrorMs;
 		s.lastError = lastError;
 		s.trialSummary = trialSummary;
+		s.portCheck = portCheck;
 		s.copyRetries = copyRetries;
 		s.copyFailures = copyFailures;
 		return s;

@@ -24,6 +24,9 @@ interface Log {
 
 	void verbose(String message);
 
+	/** Shows a BiglyBT alert (popup and alert history) and writes it to the log as a warning. */
+	void alert(String message);
+
 	/**
 	 * Writes {@code message} at {@code level} only if {@code state} differs from the last
 	 * state recorded for {@code key}.

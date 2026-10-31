@@ -51,9 +51,10 @@ Older versions are listed on the [all releases](https://github.com/Alex870/bigly
 | Verbose logging | off | Errors, warnings and port changes are always logged. This adds per-check detail |
 | Check now | — | Runs a check immediately |
 | NAT-PMP comparison trial | on | Asks the gateway (default `10.2.0.1`) about the Proton app's port and compares the answer with the log. Never changes ports. Uses the same 60 s mapping lifetime as the app, which renews every 30 s. Turn it off if you suspect it interferes with the Proton app |
+| Alert on disagreement | on | Shows a BiglyBT alert when the log and the VPN server keep disagreeing about the port (after one quick re-check). BiglyBT always stays on the log's port |
 | Reset NAT-PMP trial statistics | — | Clears the counters shown in Status |
 
-The **Status** group shows the log file in use, the last check result, the ports from the log and in BiglyBT, the last change, the last error, and a summary of the NAT-PMP trial. Messages appear in the plugin's log view (**View -> Plugins -> ProtonVpnPort**).
+The **Status** group shows the log file in use, the last check result, the ports from the log and in BiglyBT, the **port check** (whether the VPN server confirms the log's port, or a disagreement with both ports and the age of the log entry), the last change, the last error, and a summary of the NAT-PMP trial. Messages appear in the plugin's log view (**View -> Plugins -> ProtonVpnPort**).
 
 ### NAT-PMP trial data
 

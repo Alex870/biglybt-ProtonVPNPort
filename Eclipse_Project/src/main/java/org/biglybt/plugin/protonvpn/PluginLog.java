@@ -39,6 +39,11 @@ final class PluginLog implements Log {
 	}
 
 	@Override
+	public void alert(String message) {
+		channel.logAlert(LoggerChannel.LT_WARNING, message);
+	}
+
+	@Override
 	public void verbose(String message) {
 		if (verboseEnabled.getAsBoolean()) {
 			channel.log(LoggerChannel.LT_INFORMATION, "[verbose] " + message);

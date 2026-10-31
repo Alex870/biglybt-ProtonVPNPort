@@ -96,6 +96,19 @@ class LogFilePortSourceTest {
 	}
 
 	@Test
+	void carriesTheLogEntryTimeAndCanBeForcedToReread() throws IOException {
+		writeLog("2026-10-31T16:47:18.662Z | INFO | x | Port pair 49669->49669, expiring in 00:01:00\n", 5000);
+		LogFilePortSource src = source(LogFilePortSource.FILES_COPY);
+		long expected = java.time.Instant.parse("2026-10-31T16:47:18.662Z").toEpochMilli();
+		assertEquals(expected, src.query().logEntryTimeMs);
+		assertEquals(expected, src.query().logEntryTimeMs, "kept on UNCHANGED results");
+		assertEquals(1, copies.get());
+		src.invalidateCache();
+		assertEquals(PortResult.Kind.FOUND, src.query().kind);
+		assertEquals(2, copies.get());
+	}
+
+	@Test
 	void forcedRereadAfterMaxCacheAge() throws IOException {
 		// Windows may report stale size/mtime for a file another process holds open
 		writeLog("Port pair 51234->51234\n", 5000);

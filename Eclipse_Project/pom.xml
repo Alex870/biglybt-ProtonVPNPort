@@ -4,7 +4,7 @@
   <groupId>io.github.alex870</groupId>
   <artifactId>protonport</artifactId>
   <!-- Single source of truth for the plugin version: copied into plugin.properties at build time. -->
-  <version>0.1.1</version>
+  <version>0.1.2</version>
   <name>BiglyBT Proton VPN Port Auto-Config</name>
 
   <properties>

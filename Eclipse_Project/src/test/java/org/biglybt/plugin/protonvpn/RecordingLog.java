@@ -33,6 +33,11 @@ final class RecordingLog implements Log {
 	}
 
 	@Override
+	public void alert(String message) {
+		messages.add("ALERT " + message);
+	}
+
+	@Override
 	public void verbose(String message) {
 		verbose.add(message);
 	}

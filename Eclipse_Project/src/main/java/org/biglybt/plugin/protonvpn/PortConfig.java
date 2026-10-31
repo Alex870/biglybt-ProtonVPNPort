@@ -86,16 +86,19 @@ public class PortConfig implements UnloadablePlugin {
 		final BooleanParameter natEnable = configModel.addBooleanParameter2(ID + ".natpmp.enable", ID + ".natpmp.enable", true);
 		final StringParameter natGateway = configModel.addStringParameter2(ID + ".natpmp.gateway", ID + ".natpmp.gateway",
 				NatPmpPortSource.DEFAULT_GATEWAY);
+		final BooleanParameter alertOnDisagreement = configModel.addBooleanParameter2(ID + ".natpmp.alert",
+				ID + ".natpmp.alert", true);
 		final ActionParameter resetStats = configModel.addActionParameter2(ID + ".natpmp.reset_stats", ID + ".natpmp.reset_stats.button");
-		configModel.createGroup(ID + ".group.natpmp", natEnable, natGateway, resetStats);
+		configModel.createGroup(ID + ".group.natpmp", natEnable, natGateway, alertOnDisagreement, resetStats);
 
 		LabelParameter stPath = configModel.addLabelParameter2(ID + ".status.log_path");
 		LabelParameter stCheck = configModel.addLabelParameter2(ID + ".status.last_check");
 		LabelParameter stPorts = configModel.addLabelParameter2(ID + ".status.ports");
+		LabelParameter stPortCheck = configModel.addLabelParameter2(ID + ".status.port_check");
 		LabelParameter stChange = configModel.addLabelParameter2(ID + ".status.last_change");
 		LabelParameter stError = configModel.addLabelParameter2(ID + ".status.last_error");
 		LabelParameter stTrial = configModel.addLabelParameter2(ID + ".status.trial");
-		configModel.createGroup(ID + ".group.status", stPath, stCheck, stPorts, stChange, stError, stTrial);
+		configModel.createGroup(ID + ".group.status", stPath, stCheck, stPorts, stPortCheck, stChange, stError, stTrial);
 
 		enable.addEnabledOnSelection(checkSecs);
 		enable.addEnabledOnSelection(logPath);
@@ -103,6 +106,7 @@ public class PortConfig implements UnloadablePlugin {
 		enable.addEnabledOnSelection(checkNow);
 		enable.addEnabledOnSelection(natEnable);
 		natEnable.addEnabledOnSelection(natGateway);
+		natEnable.addEnabledOnSelection(alertOnDisagreement);
 
 		// --- Components -------------------------------------------------------------
 		final Log log = new PluginLog(channel, verbose::getValue);
@@ -153,11 +157,12 @@ public class PortConfig implements UnloadablePlugin {
 		if (trialFile == null) trialFile = new File(System.getProperty("java.io.tmpdir"), "protonport-" + TRIAL_FILE);
 		TrialRecorder recorder = new TrialRecorder(trialFile);
 
-		StatusView statusView = new StatusView(stPath, stCheck, stPorts, stChange, stError, stTrial, viewModel.getStatus());
+		StatusView statusView = new StatusView(stPath, stCheck, stPorts, stChange, stError, stTrial, stPortCheck,
+				viewModel.getStatus());
 
-		final PortCheck check = new PortCheck(logSource, natSource, natEnable::getValue, applier, tracker, recorder,
-				log, statusView, clock);
 		final CheckScheduler scheduler = new CheckScheduler();
+		final PortCheck check = new PortCheck(logSource, natSource, natEnable::getValue, applier, tracker, recorder,
+				log, statusView, clock, new PortAgreement(), alertOnDisagreement::getValue, scheduler::requestSoon);
 
 		if (tracker.ensureSchema(TRIAL_SCHEMA, clock.getAsLong())) {
 			log.info("NAT-PMP trial statistics reset: this version asks about the Proton app's own mapping, "

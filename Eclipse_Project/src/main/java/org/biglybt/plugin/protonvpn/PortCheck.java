@@ -19,12 +19,16 @@ final class PortCheck {
 	private final Log log;
 	private final Status.Sink statusSink;
 	private final LongSupplier clock;
+	private final PortAgreement agreement;
+	private final BooleanSupplier alertsEnabled;
+	private final Runnable requestRecheck;
 
 	private final Status status = new Status();
 
 	PortCheck(LogFilePortSource logSource, NatPmpProbe natPmp, BooleanSupplier natPmpEnabled,
 			PortApplier applier, ComparisonTracker tracker, TrialRecorder recorder, Log log,
-			Status.Sink statusSink, LongSupplier clock) {
+			Status.Sink statusSink, LongSupplier clock, PortAgreement agreement, BooleanSupplier alertsEnabled,
+			Runnable requestRecheck) {
 		this.logSource = logSource;
 		this.natPmp = natPmp;
 		this.natPmpEnabled = natPmpEnabled;
@@ -34,6 +38,9 @@ final class PortCheck {
 		this.log = log;
 		this.statusSink = statusSink;
 		this.clock = clock;
+		this.agreement = agreement;
+		this.alertsEnabled = alertsEnabled;
+		this.requestRecheck = requestRecheck;
 	}
 
 	/** Runs one check. Synchronized so a "Check now" can't overlap a timed check. */
@@ -49,10 +56,14 @@ final class PortCheck {
 				if (logPort != null && PortApplier.isValid(logPort)) {
 					// Ask about (and renew) the app's own mapping; see NatPmpPortSource.
 					PortResult natResult = natPmp.query(logPort, logPort);
-					handleTrial(logResult, natResult, now);
+					ComparisonTracker.Evaluation eval = handleTrial(logResult, natResult, now);
+					apply(agreement.record(eval.outcome, logResult, natResult, now));
 				} else {
 					log.verbose("NAT-PMP trial skipped: no valid port in the log to ask the gateway about");
+					apply(agreement.nothingToCheck());
 				}
+			} else {
+				apply(agreement.off());
 			}
 		} catch (Throwable t) {
 			log.error("Unexpected error during port check", t);
@@ -121,7 +132,27 @@ final class PortCheck {
 		}
 	}
 
-	private void handleTrial(PortResult logResult, PortResult natResult, long now) {
+	private void apply(PortAgreement.Decision d) {
+		status.portCheck = d.statusText;
+		if (d.logLine != null) {
+			log.info(d.logLine);
+		}
+		if (d.alert != null) {
+			if (alertsEnabled.getAsBoolean()) {
+				log.alert(d.alert);
+			} else {
+				log.warn(d.alert);
+			}
+		}
+		if (d.recheckSoon) {
+			log.info("Port check: the log and the VPN server disagree; re-reading the log and checking again in about "
+					+ CheckScheduler.TICK_MS / 1000 + " s");
+			logSource.invalidateCache();
+			requestRecheck.run();
+		}
+	}
+
+	private ComparisonTracker.Evaluation handleTrial(PortResult logResult, PortResult natResult, long now) {
 		ComparisonTracker.Evaluation eval = tracker.record(logResult, natResult, now);
 		log.verbose("NAT-PMP trial: log=" + logResult + ", nat-pmp=" + natResult + " -> " + eval.outcome);
 
@@ -146,6 +177,7 @@ final class PortCheck {
 					"Could not write NAT-PMP trial file " + recorder.file() + ": " + e.getMessage());
 		}
 		status.trialSummary = tracker.summary();
+		return eval;
 	}
 
 	private void recordError(String message, long now) {

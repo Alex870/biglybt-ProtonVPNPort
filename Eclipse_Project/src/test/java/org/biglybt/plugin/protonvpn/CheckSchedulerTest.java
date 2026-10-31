@@ -51,6 +51,18 @@ class CheckSchedulerTest {
 	}
 
 	@Test
+	void requestSoonFiresOnNextTickOnce() {
+		CheckScheduler s = new CheckScheduler();
+		s.markChecked(15_000);
+		assertFalse(s.isDue(30_000, 120));
+		s.requestSoon();
+		assertTrue(s.isDue(30_000, 120));
+		s.markChecked(30_000);
+		assertFalse(s.isDue(45_000, 120), "back to the normal interval after the re-check");
+		assertTrue(s.isDue(150_000, 120));
+	}
+
+	@Test
 	void minimumIntervalFiresEveryTick() {
 		assertEquals(listOf(15, 30, 45, 60), simulate(15, 60, 300));
 	}
