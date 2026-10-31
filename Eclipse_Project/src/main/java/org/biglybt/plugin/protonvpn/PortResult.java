@@ -29,9 +29,21 @@ final class PortResult {
 	final String sourcePath;
 	/** Last-modified time of the source file (epoch ms), or -1. */
 	final long sourceMtimeMs;
+	/** NAT-PMP only: internal port echoed by the gateway, or -1. */
+	final int gatewayInternalPort;
+	/** NAT-PMP only: mapping lifetime granted by the gateway (s), or -1. */
+	final long gatewayLifetimeSecs;
+	/** NAT-PMP only: gateway's "seconds since start of epoch" counter, or -1. */
+	final long gatewayEpochSecs;
 
 	private PortResult(Kind kind, Integer tcpPort, Integer udpPort, String detail, long timestampMs,
 			long elapsedMs, String sourcePath, long sourceMtimeMs) {
+		this(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs, -1, -1, -1);
+	}
+
+	private PortResult(Kind kind, Integer tcpPort, Integer udpPort, String detail, long timestampMs,
+			long elapsedMs, String sourcePath, long sourceMtimeMs, int gatewayInternalPort,
+			long gatewayLifetimeSecs, long gatewayEpochSecs) {
 		this.kind = kind;
 		this.tcpPort = tcpPort;
 		this.udpPort = udpPort;
@@ -40,6 +52,15 @@ final class PortResult {
 		this.elapsedMs = elapsedMs;
 		this.sourcePath = sourcePath;
 		this.sourceMtimeMs = sourceMtimeMs;
+		this.gatewayInternalPort = gatewayInternalPort;
+		this.gatewayLifetimeSecs = gatewayLifetimeSecs;
+		this.gatewayEpochSecs = gatewayEpochSecs;
+	}
+
+	/** Returns a copy carrying the extra fields of a NAT-PMP reply. */
+	PortResult withGatewayReply(int internalPort, long lifetimeSecs, long epochSecs) {
+		return new PortResult(kind, tcpPort, udpPort, detail, timestampMs, elapsedMs, sourcePath, sourceMtimeMs,
+				internalPort, lifetimeSecs, epochSecs);
 	}
 
 	static PortResult found(int port, String detail, long now, long elapsedMs, String path, long mtime) {
@@ -81,6 +102,10 @@ final class PortResult {
 		} else {
 			if (tcpPort != null) sb.append(" tcp=").append(tcpPort);
 			if (udpPort != null) sb.append(" udp=").append(udpPort);
+		}
+		if (gatewayInternalPort >= 0) {
+			sb.append(" [gateway: internal=").append(gatewayInternalPort).append(", lifetime=")
+					.append(gatewayLifetimeSecs).append("s, epoch=").append(gatewayEpochSecs).append("s]");
 		}
 		if (!detail.isEmpty()) sb.append(" (").append(detail).append(')');
 		return sb.toString();

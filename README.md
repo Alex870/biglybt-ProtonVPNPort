@@ -11,7 +11,7 @@ This plugin for BiglyBT (formerly Azureus, Vuze) reads the latest port number li
 
 It is primarily a Windows solution: it finds the Proton VPN client's log in its standard install location. On Linux and macOS it searches likely log locations, but those locations and log formats are unverified. You can always set the log path manually.
 
-Since 0.1.0 the plugin also runs an experimental **NAT-PMP comparison trial**: it asks Proton's VPN gateway for the forwarded port directly and records whether the answer matches the log. The log remains the source of truth, and NAT-PMP results never change BiglyBT's settings. The trial collects evidence on whether NAT-PMP could later replace log parsing, which would make the plugin work on any OS. See [docs/DESIGN.md](docs/DESIGN.md).
+Since 0.1.0 the plugin also runs an experimental **NAT-PMP comparison trial**. It asks Proton's VPN gateway directly about the port the Proton app is forwarding and records whether the gateway confirms the port in the log. The log remains the source of truth, and NAT-PMP results never change BiglyBT's settings. The trial checks that the plugin can talk to Proton's gateway reliably. That's the groundwork for a future mode for setups without the Proton app (for example Linux with WireGuard), where the plugin would manage the port forward itself. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ------------
 
@@ -50,18 +50,18 @@ Older versions are listed on the [all releases](https://github.com/Alex870/bigly
 | Proton VPN log file | blank | Blank means auto-detect. Set a full path to override |
 | Verbose logging | off | Errors, warnings and port changes are always logged. This adds per-check detail |
 | Check now | — | Runs a check immediately |
-| NAT-PMP comparison trial | on | Queries the gateway (default `10.2.0.1`) and compares with the log. Never changes ports. Turn it off if you suspect it interferes with the Proton app |
+| NAT-PMP comparison trial | on | Asks the gateway (default `10.2.0.1`) about the Proton app's port and compares the answer with the log. Never changes ports. Uses the same 60 s mapping lifetime as the app, which renews every 30 s. Turn it off if you suspect it interferes with the Proton app |
 | Reset NAT-PMP trial statistics | — | Clears the counters shown in Status |
 
 The **Status** group shows the log file in use, the last check result, the ports from the log and in BiglyBT, the last change, the last error, and a summary of the NAT-PMP trial. Messages appear in the plugin's log view (**View -> Plugins -> ProtonVpnPort**).
 
 ### NAT-PMP trial data
 
-Each check appends a row to `natpmp-trial.csv` in the plugin's folder inside BiglyBT's user directory (the full path is logged when the plugin loads). The file is capped at 1 MB, with one `.1` backup. Columns:
+Each check appends a row to `natpmp-trial-v2.csv` in the plugin's folder inside BiglyBT's user directory (the full path is logged when the plugin loads). The file is capped at 1 MB, with one `.1` backup. Columns:
 
-`timestamp_utc, log_kind, log_port, natpmp_kind, natpmp_tcp, natpmp_udp, outcome, tcp_udp_split, natpmp_rtt_ms, log_file_mtime_utc`
+`timestamp_utc, log_kind, log_port, natpmp_kind, natpmp_tcp, natpmp_udp, outcome, tcp_udp_split, natpmp_rtt_ms, natpmp_internal_port, natpmp_lifetime_s, natpmp_epoch_s, log_file_mtime_utc`
 
-Outcomes: `MATCH`, `MISMATCH`, `LOG_ONLY` (NAT-PMP failed), `NATPMP_ONLY` (log had no port), `NEITHER`. Please attach this file to an issue after a few weeks of use. It's what decides whether NAT-PMP gets promoted (see [docs/DESIGN.md §6](docs/DESIGN.md)).
+Outcomes: `MATCH` (the gateway confirms the log's port), `MISMATCH`, `LOG_ONLY` (NAT-PMP failed). Checks where the log has no port are skipped. Please attach this file to an issue after a few weeks of use. It's part of deciding whether a NAT-PMP mode gets added (see [docs/DESIGN.md §6](docs/DESIGN.md)).
 
 ------------
 

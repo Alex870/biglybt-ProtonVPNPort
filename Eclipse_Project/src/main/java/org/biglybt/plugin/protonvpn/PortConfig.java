@@ -32,7 +32,9 @@ public class PortConfig implements UnloadablePlugin {
 
 	static final String ID = "protonport";
 	static final String MESSAGES = "org.biglybt.plugin.protonvpn.messages.Messages";
-	static final String TRIAL_FILE = "natpmp-trial.csv";
+	/** Versioned: v2 asks about the app's mapping instead of creating a new one (v1, internal port 1). */
+	static final String TRIAL_FILE = "natpmp-trial-v2.csv";
+	static final long TRIAL_SCHEMA = 2;
 	static final long STALE_TEMP_AGE_MS = 60 * 60_000;
 
 	private final LongSupplier clock = System::currentTimeMillis;
@@ -157,6 +159,10 @@ public class PortConfig implements UnloadablePlugin {
 				log, statusView, clock);
 		final CheckScheduler scheduler = new CheckScheduler();
 
+		if (tracker.ensureSchema(TRIAL_SCHEMA, clock.getAsLong())) {
+			log.info("NAT-PMP trial statistics reset: this version asks about the Proton app's own mapping, "
+					+ "so earlier results are not comparable");
+		}
 		check.refreshTrialSummary();
 		log.info("Proton Port Auto-Config loaded (" + LogLocator.detectOs(System.getProperty("os.name")) + "); "
 				+ (enable.getValue() ? "enabled" : "disabled") + ", checking every " + checkSecs.getValue() + " s"

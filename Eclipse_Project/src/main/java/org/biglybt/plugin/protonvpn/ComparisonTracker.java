@@ -37,6 +37,7 @@ final class ComparisonTracker {
 	static final String TRANSIENT = "mismatch_transient";
 	static final String PERSISTENT = "mismatch_persistent";
 	static final String NATPMP_LED = "natpmp_led";
+	static final String SCHEMA = "schema";
 
 	/** Result of recording one comparison. */
 	static final class Evaluation {
@@ -135,6 +136,19 @@ final class ComparisonTracker {
 		previousMismatchKey = null;
 		mismatchStreak = 0;
 		streakNatPort = null;
+	}
+
+	/**
+	 * Resets the counters if they were recorded under a different trial method, so old
+	 * results don't mix with new ones.
+	 * @return true if the counters were reset
+	 */
+	synchronized boolean ensureSchema(long schema, long nowMs) {
+		if (get(SCHEMA) == schema) return false;
+		boolean hadData = get(SINCE) != 0;
+		reset(nowMs);
+		set(SCHEMA, schema);
+		return hadData;
 	}
 
 	/** One-line summary for the status area, e.g. "412 match / 3 mismatch (...) since 2026-11-02". */

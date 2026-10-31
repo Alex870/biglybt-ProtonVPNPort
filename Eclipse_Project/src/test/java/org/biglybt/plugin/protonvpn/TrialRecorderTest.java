@@ -18,7 +18,7 @@ class TrialRecorderTest {
 	Path tmp;
 
 	final PortResult log = PortResult.found(51234, "", 0, 0, "f", 1_700_000_000_000L);
-	final PortResult nat = PortResult.found(51234, 51234, "", 0, 7);
+	final PortResult nat = PortResult.found(51234, 51234, "", 0, 7).withGatewayReply(51234, 60, 777);
 	final ComparisonTracker.Evaluation eval = new ComparisonTracker.Evaluation(ComparisonTracker.Outcome.MATCH, 51234, 51234, false, true, 0);
 
 	@Test
@@ -30,8 +30,8 @@ class TrialRecorderTest {
 		List<String> lines = Files.readAllLines(f.toPath(), StandardCharsets.UTF_8);
 		assertEquals(3, lines.size());
 		assertEquals(TrialRecorder.HEADER, lines.get(0));
-		assertEquals("1970-01-01T00:00:00Z,FOUND,51234,FOUND,51234,51234,MATCH,false,7,2023-11-14T22:13:20Z", lines.get(1));
-		assertEquals("1970-01-01T00:00:01Z,FOUND,51234,ERROR,,,LOG_ONLY,false,,2023-11-14T22:13:20Z", lines.get(2));
+		assertEquals("1970-01-01T00:00:00Z,FOUND,51234,FOUND,51234,51234,MATCH,false,7,51234,60,777,2023-11-14T22:13:20Z", lines.get(1));
+		assertEquals("1970-01-01T00:00:01Z,FOUND,51234,ERROR,,,LOG_ONLY,false,,,,,2023-11-14T22:13:20Z", lines.get(2));
 	}
 
 	@Test

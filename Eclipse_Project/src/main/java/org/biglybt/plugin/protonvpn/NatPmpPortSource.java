@@ -6,18 +6,22 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * Secondary port source used only for the NAT-PMP comparison trial (docs/DESIGN.md §4.6).
- * Its results are never applied to BiglyBT in v0.1.x.
+ * NAT-PMP side of the comparison trial (docs/DESIGN.md §4.6). Its results are never
+ * applied to BiglyBT.
  *
- * <p>Sends the same requests as Proton's documented {@code natpmpc} commands (UDP and TCP,
- * internal port 1, external port 0, lifetime 60 s). Note these requests create or renew a
- * mapping on the gateway; the trial can be switched off in settings.
+ * <p>The trial asks about the <b>Proton app's own mapping</b>: it requests the port the
+ * log reports as both the internal and the suggested external port. Proton allows one
+ * working forward per VPN session and the app already holds it, so a request for a new
+ * mapping (Proton's Linux recipe, internal port 1) returns a port that doesn't forward
+ * anything (observed 2026-10-31).
+ *
+ * <p>NAT-PMP has no read-only query: every request also renews the mapping, to
+ * {@link #REQUEST_LIFETIME_SECS}. That matches the Windows app, which asks for 60 s and
+ * renews every 30 s, so the trial never shortens the app's mapping.
  */
-final class NatPmpPortSource implements PortSource {
+final class NatPmpPortSource implements NatPmpProbe {
 
 	static final String DEFAULT_GATEWAY = "10.2.0.1";
-	static final int REQUEST_INTERNAL_PORT = 1;
-	static final int REQUEST_EXTERNAL_PORT = 0;
 	static final long REQUEST_LIFETIME_SECS = 60;
 
 	private final Supplier<String> gateway;
@@ -31,7 +35,7 @@ final class NatPmpPortSource implements PortSource {
 	}
 
 	@Override
-	public PortResult query() {
+	public PortResult query(int internalPort, int suggestedExternalPort) {
 		long now = clock.getAsLong();
 		try {
 			String gw = gateway.get();
@@ -40,23 +44,18 @@ final class NatPmpPortSource implements PortSource {
 			}
 			InetAddress address = InetAddress.getByName(gw.trim());
 
-			Integer udp = null;
-			Integer tcp = null;
-			long rtt = 0;
+			NatPmpClient.Mapping udp = null;
+			NatPmpClient.Mapping tcp = null;
 			StringBuilder errors = new StringBuilder();
 			try {
-				NatPmpClient.Mapping m = client.requestMapping(address, NatPmpClient.OP_UDP,
-						REQUEST_INTERNAL_PORT, REQUEST_EXTERNAL_PORT, REQUEST_LIFETIME_SECS);
-				udp = m.externalPort;
-				rtt += m.rttMs;
+				udp = client.requestMapping(address, NatPmpClient.OP_UDP, internalPort, suggestedExternalPort,
+						REQUEST_LIFETIME_SECS);
 			} catch (IOException e) {
 				errors.append("UDP: ").append(e.getMessage());
 			}
 			try {
-				NatPmpClient.Mapping m = client.requestMapping(address, NatPmpClient.OP_TCP,
-						REQUEST_INTERNAL_PORT, REQUEST_EXTERNAL_PORT, REQUEST_LIFETIME_SECS);
-				tcp = m.externalPort;
-				rtt += m.rttMs;
+				tcp = client.requestMapping(address, NatPmpClient.OP_TCP, internalPort, suggestedExternalPort,
+						REQUEST_LIFETIME_SECS);
 			} catch (IOException e) {
 				if (errors.length() > 0) errors.append("; ");
 				errors.append("TCP: ").append(e.getMessage());
@@ -64,7 +63,11 @@ final class NatPmpPortSource implements PortSource {
 			if (udp == null && tcp == null) {
 				return PortResult.error(errors.toString(), now, null);
 			}
-			return PortResult.found(tcp, udp, errors.toString(), now, rtt);
+			long rtt = (udp != null ? udp.rttMs : 0) + (tcp != null ? tcp.rttMs : 0);
+			NatPmpClient.Mapping reported = tcp != null ? tcp : udp;
+			return PortResult.found(tcp != null ? tcp.externalPort : null, udp != null ? udp.externalPort : null,
+					errors.toString(), now, rtt)
+					.withGatewayReply(reported.internalPort, reported.lifetimeSecs, reported.epochSecs);
 		} catch (Throwable t) {
 			return PortResult.error("NAT-PMP query failed: " + t, now, null);
 		}

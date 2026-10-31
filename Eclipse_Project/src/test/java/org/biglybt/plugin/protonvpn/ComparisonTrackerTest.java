@@ -106,6 +106,19 @@ class ComparisonTrackerTest {
 	}
 
 	@Test
+	void schemaChangeResetsOldResultsOnce() {
+		assertFalse(tracker.ensureSchema(2, 10), "fresh install: nothing to reset worth reporting");
+		tracker.record(log(1), nat(1), 20);
+		assertFalse(tracker.ensureSchema(2, 30), "same schema: keep the data");
+		assertEquals(1, tracker.count(Outcome.MATCH));
+		// simulate results recorded by the v1 trial (no schema stored)
+		store.remove(ComparisonTracker.KEY_PREFIX + ComparisonTracker.SCHEMA);
+		assertTrue(tracker.ensureSchema(2, 40));
+		assertEquals(0, tracker.count(Outcome.MATCH));
+		assertEquals(40, tracker.count(ComparisonTracker.SINCE));
+	}
+
+	@Test
 	void counterKeysIgnoreDefaultLocale() {
 		Locale previous = Locale.getDefault();
 		try {

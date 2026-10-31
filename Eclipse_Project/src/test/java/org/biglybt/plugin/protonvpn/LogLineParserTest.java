@@ -9,13 +9,30 @@ import org.junit.jupiter.api.Test;
 
 class LogLineParserTest {
 
-	// Synthetic lines modelled on the "Port pair X->Y" text the 0.0.2 parser looked for.
-	// TODO: replace/extend with anonymized lines from a real Proton VPN client-logs.txt.
-	static final String LINE = "2026-10-31 10:00:00.000 | INFO  | CONN:PORT_FORWARDING | Port pair 51234->51234, expiring in 59 seconds";
+	// Real lines from a Proton VPN for Windows client-logs.txt (2026-10-31). The app logs its
+	// port-forwarding state about every 10 s and renews the 60 s mapping every 30 s.
+	static final String LINE = "2026-10-31T16:47:18.662Z | INFO  | PROCESS.COMM | Received PortForwarding Status "
+			+ "'SleepingUntilRefresh' triggered at '10/31/2026 4:46:59 PM', Port pair 49669->49669, expiring in "
+			+ "00:01:00 at 10/31/2026 4:47:59 PM | {\"Caller\":\"ClientControllerListener.StartPortForwardingStateListenerAsync:121\"}";
+	static final String RENEWAL_LINE = "2026-10-31T16:47:29.609Z | INFO  | PROCESS.COMM | Received PortForwarding Status "
+			+ "'PortMappingCommunication' triggered at '10/31/2026 4:47:29 PM', Port pair 49669->49669, expiring in "
+			+ "00:01:00 at 10/31/2026 4:47:59 PM | {\"Caller\":\"ClientControllerListener.StartPortForwardingStateListenerAsync:121\"}";
+	static final String STATUS_CHANGE_LINE = "2026-10-31T16:47:29.609Z | INFO  | APP | Port forwarding status changed from "
+			+ "'SleepingUntilRefresh' to 'PortMappingCommunication'. | {\"Caller\":\"PortForwardingManager.SetStatus:84\"}";
+	static final String BOM = "\uFEFF";
 
 	@Test
-	void parsesTypicalLine() {
-		assertEquals(new LogLineParser.PortPair(51234, 51234), LogLineParser.parseLine(LINE));
+	void parsesRealWindowsClientLines() {
+		assertEquals(new LogLineParser.PortPair(49669, 49669), LogLineParser.parseLine(LINE));
+		assertEquals(new LogLineParser.PortPair(49669, 49669), LogLineParser.parseLine(RENEWAL_LINE));
+		assertNull(LogLineParser.parseLine(STATUS_CHANGE_LINE));
+	}
+
+	@Test
+	void realLogWithByteOrderMarkAndNewerPortAtEnd() throws Exception {
+		String text = BOM + LINE + "\n" + STATUS_CHANGE_LINE + "\n" + RENEWAL_LINE + "\n"
+				+ RENEWAL_LINE.replace("49669->49669", "51002->51002") + "\n" + STATUS_CHANGE_LINE + "\n";
+		assertEquals(new LogLineParser.PortPair(51002, 51002), LogLineParser.findLast(new BufferedReader(new StringReader(text))));
 	}
 
 	@Test

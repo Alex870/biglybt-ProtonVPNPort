@@ -161,21 +161,32 @@ class NatPmpClientTest {
 	}
 
 	@Test
-	void portSourceQueriesUdpAndTcp() throws Exception {
-		gateway = new FakeGateway(req -> new byte[][] { response(128 + req[1], 0, 1, 1, req[1] == 1 ? 50000 : 50001, 60) });
+	void portSourceAsksAboutTheGivenMappingOverUdpAndTcp() throws Exception {
+		java.util.List<byte[]> seen = java.util.Collections.synchronizedList(new java.util.ArrayList<byte[]>());
+		gateway = new FakeGateway(req -> {
+			seen.add(req);
+			return new byte[][] { response(128 + req[1], 0, 777, 49669, req[1] == 1 ? 49669 : 49670, 60) };
+		});
 		NatPmpPortSource src = new NatPmpPortSource(() -> "127.0.0.1", client(), () -> 42L);
-		PortResult r = src.query();
+		PortResult r = src.query(49669, 49669);
 		assertEquals(PortResult.Kind.FOUND, r.kind);
-		assertEquals(Integer.valueOf(50000), r.udpPort);
-		assertEquals(Integer.valueOf(50001), r.tcpPort);
-		assertEquals(2, gateway.requests.get());
+		assertEquals(Integer.valueOf(49669), r.udpPort);
+		assertEquals(Integer.valueOf(49670), r.tcpPort);
+		assertEquals(2, seen.size());
+		// internal port, suggested external port and the app's 60 s lifetime
+		assertArrayEquals(NatPmpClient.encodeMappingRequest(NatPmpClient.OP_UDP, 49669, 49669, 60), seen.get(0));
+		assertArrayEquals(NatPmpClient.encodeMappingRequest(NatPmpClient.OP_TCP, 49669, 49669, 60), seen.get(1));
+		// gateway reply fields from the TCP mapping are kept for the trial file
+		assertEquals(49669, r.gatewayInternalPort);
+		assertEquals(60, r.gatewayLifetimeSecs);
+		assertEquals(777, r.gatewayEpochSecs);
 	}
 
 	@Test
 	void portSourceErrorsAreResultsNotExceptions() throws Exception {
 		gateway = new FakeGateway(req -> null);
-		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> "127.0.0.1", client(), () -> 1L).query().kind);
-		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> " ", client(), () -> 1L).query().kind);
-		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> "not a host name !", client(), () -> 1L).query().kind);
+		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> "127.0.0.1", client(), () -> 1L).query(49669, 49669).kind);
+		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> " ", client(), () -> 1L).query(49669, 49669).kind);
+		assertEquals(PortResult.Kind.ERROR, new NatPmpPortSource(() -> "not a host name !", client(), () -> 1L).query(49669, 49669).kind);
 	}
 }

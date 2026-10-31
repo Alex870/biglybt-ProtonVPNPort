@@ -6,7 +6,7 @@ Status: v0.1.0 implemented · Applies to: plugin v0.0.2 → v1.0
 
 | Version | State |
 |---|---|
-| v0.1.0 | **Implemented** (unit-tested; not yet tested in a live BiglyBT + Proton VPN setup) |
+| v0.1.0 | **Implemented.** First live test 2026-10-31 (Windows): port detection and setting confirmed working, and the NAT-PMP trial revised as a result (§4.6.1) |
 | v0.2.0 – v1.0.0 | Not started |
 
 Where v0.1.0 differs from or adds to the text below:
@@ -16,6 +16,7 @@ Where v0.1.0 differs from or adds to the text below:
 - **Logging settings (§4.5).** The old `debug_level` setting is no longer registered. `verbose` takes its default from the old `debug` value.
 - **Project layout (§4.1).** `Eclipse_Project/` keeps its name, but it now uses the standard Maven layout inside (`src/main/resources`, `src/test/java`). Moving it to the repo root is still planned for v0.2.0.
 - **GitHub Releases** (planned for v0.2.0) were adopted in v0.1.0. The jar is no longer committed; see `docs/RELEASING.md`.
+- **NAT-PMP trial request (§4.6).** Revised after the first live test: the trial asks about the app's mapping (internal and suggested port = log port, 60 s) instead of creating a new one, and skips checks with no log port. Counters reset on the schema change, and the trial file is now `natpmp-trial-v2.csv`.
 - **Unload.** The plugin implements `UnloadablePlugin`, so its timer and UI are cleaned up on unload.
 
 This document covers what changes in the plugin, why, and in what order. It
@@ -94,7 +95,7 @@ Rules:
 |---|---|---|
 | **v0.1.0** (next update) | Stabilize + trial | Repo and build cleanup, bug fixes, safer log handling, OS-neutral paths, **NAT-PMP shadow trial**, status UI |
 | **v0.2.0** | Harden + automate | CI, release automation, package rename, stale-port handling, restore-on-disable, binding hint, evaluate trial data |
-| **v0.3.0** | Promote (conditional) | If the trial criteria are met: NAT-PMP becomes the primary source on non-Windows (and optionally Windows), with mapping keep-alive; log becomes the fallback |
+| **v0.3.0** | NAT-PMP mode (conditional) | If the criteria are met: a NAT-PMP "own mapping" mode with keep-alive for setups without the Proton app (e.g. Linux + WireGuard). The log stays primary on Windows |
 | **v1.0.0** | Distribute | Naming conventions, documentation, BiglyBT plugin listing, update checks |
 
 The sections below describe each version in detail.
@@ -246,29 +247,39 @@ configs carry over):
 
 ### 4.6 NAT-PMP shadow trial (secondary source)
 
-**Purpose.** Find out whether asking Proton's gateway over NAT-PMP reliably
-gives the same port as the log. If it does, NAT-PMP can become the OS-neutral
-primary source in v0.3.0.
+> **Revised after the first live test (2026-10-31).** The original design asked
+> the gateway for a *new* mapping, using Proton's Linux recipe (internal port 1).
+> On Windows, with the Proton app running, that returned a different port from
+> the app's, and the port didn't forward anything. See §4.6.1. The trial now asks
+> about the **app's own mapping** instead.
+
+**Purpose.** Check that the plugin can talk to Proton's gateway over NAT-PMP and
+that the gateway confirms the port the log reports. On Windows this can't make
+NAT-PMP a replacement for the log: to ask about the app's mapping you need to
+know its port, and only the log tells us that. What the trial does establish is
+the groundwork for a NAT-PMP mode on setups without the Proton app (§6).
 
 **Rules for the trial period**
 - The **log is the source of truth.** NAT-PMP results are **never** written to
-  BiglyBT's config in v0.1.x.
+  BiglyBT's config.
 - A NAT-PMP failure never blocks or delays applying the log's result. It runs
   after the log check, with short timeouts.
-- It can be turned off in settings (`natpmp.enable`) in case it causes trouble.
+- **No request without a port from the log.** If the log has no valid port, the
+  trial skips that check rather than creating a new mapping.
+- It can be turned off in settings (`natpmp.enable`).
 
-**Protocol** (RFC 6886, the same requests as Proton's documented
-`natpmpc -a 1 0 udp 60 -g 10.2.0.1` / `... tcp ...`):
+**Protocol** (RFC 6886). The request asks about the mapping for the log's port,
+with the same lifetime the Windows app uses:
 
 ```
-Request (12 bytes)            Response (16 bytes)
- 0  u8  version = 0            0  u8  version = 0
- 1  u8  opcode 1=UDP 2=TCP     1  u8  opcode + 128
- 2  u16 reserved = 0           2  u16 result code (0 = success)
- 4  u16 internal port = 1      4  u32 seconds since start of epoch
- 6  u16 suggested ext = 0      8  u16 internal port
- 8  u32 lifetime = 60         10  u16 mapped external port   ← the value we compare
-                              12  u32 lifetime granted
+Request (12 bytes)                 Response (16 bytes)
+ 0  u8  version = 0                 0  u8  version = 0
+ 1  u8  opcode 1=UDP 2=TCP          1  u8  opcode + 128
+ 2  u16 reserved = 0                2  u16 result code (0 = success)
+ 4  u16 internal port = log port    4  u32 seconds since start of epoch  (recorded)
+ 6  u16 suggested ext = log port    8  u16 internal port                 (recorded)
+ 8  u32 lifetime = 60              10  u16 mapped external port   ← compared with the log
+                                   12  u32 lifetime granted              (recorded)
 ```
 
 - Transport: `DatagramSocket` to `gateway:5351`. Timeouts of 250 ms, 500 ms and
@@ -278,29 +289,47 @@ Request (12 bytes)            Response (16 bytes)
 - `NatPmpClient.encodeRequest` and `decodeResponse` are pure functions and are unit-tested with fixed byte arrays.
 - No extra dependencies.
 
-**Known risk.** A mapping request is not read-only. It creates or renews a
-60-second mapping on the gateway. On Windows the Proton app maintains the same
-mapping, and we expect the gateway to return the session's single assigned
-port. The trial must confirm this doesn't disturb the app's own mapping. That's
-why it can be switched off, and why its first data points get special
-attention.
+**Why the request is safe.** NAT-PMP has no read-only query, so every request
+also renews the mapping, to the lifetime it asks for. The Windows app asks for
+60 s and renews every 30 s (§4.6.1). The trial also asks for 60 s, so it only
+moves the expiry to roughly where the app's next renewal would put it, and never
+shortens it.
+
+**Caveat on matches.** A gateway that simply echoes back whatever port is
+suggested would always "match". The internal port, granted lifetime and epoch
+fields are recorded so that can be spotted.
 
 **Classifying each check** (`ComparisonTracker`):
 
 | Outcome | Log | NAT-PMP | Meaning |
 |---|---|---|---|
-| `MATCH` | port P | port P | Agree |
+| `MATCH` | port P | port P | The gateway confirms the app's port |
 | `MISMATCH` | port P | port Q ≠ P | Disagree. Note whether it clears by the next check (*transient*, likely just after a reconnect) or persists (*persistent*) |
 | `LOG_ONLY` | port P | error/timeout | NAT-PMP unavailable (VPN down? OpenVPN rather than WireGuard? different gateway?) |
-| `NATPMP_ONLY` | none | port Q | NAT-PMP works but the log has no port (rotation, format change, or a non-Windows platform) |
-| `NEITHER` | none | error | Probably no VPN or no port forwarding |
+| `NATPMP_ONLY`, `NEITHER` | none | — | No longer produced: without a log port the trial skips the check |
 | `TCP_UDP_SPLIT` | — | TCP ≠ UDP | Flag. We assume Proton uses one port for both |
 
 **Recording the results**
-- Counters for each outcome are stored in plugin config, so they survive restarts. They can be reset with `natpmp.reset_stats`.
-- Every outcome other than `MATCH` is logged as a warning (once per state change).
-- A trial file in CSV format, at `getPluginUserFile("natpmp-trial.csv")`: `timestamp, log_port, natpmp_tcp, natpmp_udp, outcome, natpmp_rtt_ms, log_file_mtime`. Capped at 1 MB with a single `.1` rollover. This gives hard evidence for the v0.3.0 decision and can be attached to an issue.
+- Counters for each outcome are stored in plugin config, so they survive restarts. They can be reset with `natpmp.reset_stats`. A trial *schema* number is stored with them; when it changes (v1 → v2, the request change above), the counters reset automatically so results from different methods never mix.
+- Every outcome change is logged (a warning unless it's `MATCH`).
+- A trial file in CSV format, at `getPluginUserFile("natpmp-trial-v2.csv")`: `timestamp_utc, log_kind, log_port, natpmp_kind, natpmp_tcp, natpmp_udp, outcome, tcp_udp_split, natpmp_rtt_ms, natpmp_internal_port, natpmp_lifetime_s, natpmp_epoch_s, log_file_mtime_utc`. Capped at 1 MB with a single `.1` rollover. Any v1 file (`natpmp-trial.csv`) from the first test is left as it was.
 - The status area shows a summary such as "NAT-PMP trial: 412 match / 3 mismatch (3 transient) / 5 log-only since 2026-11-02".
+
+#### 4.6.1 Findings from the first live test (2026-10-31, Windows, VM guest)
+
+| Observation | Source |
+|---|---|
+| The log port (49669) was set in BiglyBT and is **open from outside** | canyouseeme.org from inside the VM guest, via the VPN address |
+| A v1 trial request (internal port 1) returned **49260**, consistently, and that port was **not reachable** | Plugin log; BiglyBT NAT test straight after "Check now" |
+| The app's port forward stayed open while the v1 requests ran, so they didn't disturb it | Same tests |
+| The app logs `Received PortForwarding Status '<state>' … Port pair 49669->49669, expiring in 00:01:00 at <local time>` about every 10 s. The states are `SleepingUntilRefresh` and `PortMappingCommunication` | `client-logs.txt` |
+| The app **renews every 30 s with a 60 s lifetime** (146 renewals in 73 minutes, all 30 s apart). The port stayed the same for the whole session | `client-logs.txt` |
+| Proton allows **one working forward per VPN session** | Project owner's understanding; consistent with the above |
+
+Conclusions:
+1. On Windows, the log is the right source, and it stays the primary one.
+2. A plugin-held mapping can't work alongside the Proton app, so the "own mapping" question moves to the no-app setup in §6.
+3. Each line starts with an ISO-8601 UTC timestamp and repeats every ~10 s while forwarding is active. That makes a reliable "is the forward still live?" signal for stale-port handling (§5).
 
 ### 4.7 Status UI and tests
 
@@ -328,7 +357,7 @@ attention.
 |---|---|
 | **CI** | GitHub Actions. On push/PR: `mvn -B verify` on JDK 8 and 21, with the BiglyBT jar fetched from a pinned BiglyBT GitHub release asset (or cached). On a `v*` tag: build the jar and attach it to a draft GitHub Release, which automates steps 3 and 5 of `docs/RELEASING.md` |
 | **Package rename** | `org.biglybt.plugin.protonvpn` → `io.github.alex870.protonport`, so it doesn't look like it's in BiglyBT's namespace. `plugin.id=protonport` and all config keys stay the same, so user settings carry over. Only `plugin.class` / `plugin.langfile` change |
-| **Stale-port handling** | Use the trial data. If `LOG_ONLY` / `NEITHER` reliably show the VPN is down, add an *optional* "VPN appears down" status and warning (still no automatic port change). Also check, with `NetworkInterface`, for a local address in the gateway's /16 as a cheap "connected" hint |
+| **Stale-port handling** | Use the leading UTC timestamp of the last `Port pair` line. While forwarding is active, the Windows app writes one about every 10 s (§4.6.1). If the newest is more than ~2 minutes older than the log's last write (or the current time), the forward is no longer being maintained. Show "Port forwarding inactive (VPN disconnected?)" in Status and warn once (still no automatic port change). `LOG_ONLY` trial results and a `NetworkInterface` check for a local address in the gateway's /16 can corroborate it |
 | **Restore original port** | Optional setting. When the plugin first changes the port, it saves the original. On disable or shutdown (`UnloadablePlugin.unload` / closedown listener), it puts the original back |
 | **Binding hint** | Check BiglyBT's bind-IP setting. If it's empty or doesn't include the VPN interface, show a one-time warning: "Port forwarding works best when BiglyBT is bound to the Proton VPN interface (Options → Connection → Advanced Network Settings)". Inform only; never change it |
 | **Trial review** | Read the counters and CSV from real use and decide on v0.3.0 using the criteria in §6 |
@@ -336,21 +365,26 @@ attention.
 
 ---
 
-## 6. v0.3.0 — Promote NAT-PMP (only if the trial criteria are met)
+## 6. v0.3.0 — NAT-PMP mode for setups without the Proton app (only if the criteria are met)
 
-**Criteria for promotion** (all must hold over the trial period):
-- At least **4 weeks** of use and at least **20 distinct VPN sessions** (distinct log ports).
-- **Zero persistent `MISMATCH`es.** Transient mismatches are fine if they always clear by the next check *and* NAT-PMP was the side that was right, i.e. the log caught up to NAT-PMP's port.
-- NAT-PMP answers in at least **99 %** of checks where the log shows an active port.
-- No evidence that the shadow requests disturbed the Proton app's own mapping (no unexplained port changes after a NAT-PMP request).
-- `TCP_UDP_SPLIT` never seen.
+**Scope (revised after §4.6.1).** On Windows with the Proton app, the log stays
+the primary source: Proton allows one forward per session, the app owns it, and
+only the log tells us its port. NAT-PMP-primary mode is therefore aimed at
+setups **without the Proton app**, for example Linux with a manual WireGuard
+config and port forwarding enabled. There the plugin must create and keep its
+own mapping, as Proton's Linux instructions describe.
 
-**If promoted:**
-- A setting `protonport.source` with options *Auto* (default), *Log file* or *NAT-PMP*.
-  - *Auto* on Windows: NAT-PMP first, then the log if NAT-PMP fails. Keep comparing and warn on disagreement.
-  - *Auto* on Linux/macOS: NAT-PMP only, unless a log path is set.
-- **Mapping keep-alive.** Without the Windows app (for example on Linux with a manual WireGuard config), Proton requires the mapping to be renewed every 60 s or less, or the port is lost. In NAT-PMP-primary mode the plugin renews every ~45 s on its own timer, independent of the check interval, and backs off on errors.
-- README: document the cross-platform setup (WireGuard config with NAT-PMP / port forwarding enabled).
+**Criteria for adding NAT-PMP-primary mode:**
+- From the Windows trial: the gateway answers in at least **99 %** of checks where the log shows an active port, with **zero persistent `MISMATCH`es** and no `TCP_UDP_SPLIT`. This shows the plugin's NAT-PMP client works reliably against Proton's gateways.
+- From a test on a no-app setup (manual WireGuard): a mapping created and renewed by the plugin is **reachable from outside** (for example with canyouseeme.org), keeps its port across renewals for a whole session, and gets a new port after a reconnect.
+- No evidence that NAT-PMP requests disturbed the Proton app's own mapping on Windows.
+
+**If added:**
+- A setting `protonport.source` with options *Auto* (default), *Log file* or *NAT-PMP (own mapping)*.
+  - *Auto* on Windows: the log, as today. The NAT-PMP check of the app's mapping stays as a diagnostic.
+  - *Auto* on Linux/macOS: NAT-PMP (own mapping), unless a log path is set.
+- **Mapping keep-alive.** In own-mapping mode, Proton requires the mapping to be renewed within its 60 s lifetime, or the port is lost. The plugin renews every 30 s (as the Windows app does) on its own timer, independent of the check interval, and backs off on errors. Never enable this while the Proton app is managing port forwarding.
+- README: document the setup without the app (WireGuard config with NAT-PMP / port forwarding enabled).
 
 **If not promoted:** keep NAT-PMP as a diagnostic, document the failure modes
 it showed, and treat Windows log parsing as the supported path.
@@ -370,7 +404,7 @@ it showed, and treat Windows log parsing as the supported path.
 ## 8. Open questions
 
 1. **Copy vs direct read.** Covered by owner decision: keep the copy. v0.1.0's retry counters (§4.3, point 3) will show whether lock contention actually happens.
-2. **Proton Windows log rotation.** What happens to `client-logs.txt` when it rotates? Does it get renamed, truncated or numbered?
+2. **Proton Windows log rotation.** What happens to `client-logs.txt` when it rotates? Does it get renamed, truncated or numbered? The app writes about 4 KB per minute while forwarding is active (§4.6.1), so rotation is likely to happen in long sessions.
 3. **Gateway on OpenVPN.** Is `10.2.0.1` also the NAT-PMP gateway on Proton's OpenVPN connections, or only WireGuard? The trial's `LOG_ONLY` data, together with the protocol in use, will show this.
 4. **Linux/macOS log format.** Does Proton's Linux app log forwarded ports at all, and in what format? This only matters if NAT-PMP isn't promoted.
 5. **BiglyBT core on Maven.** Confirm whether a published artifact exists. If one does, use it instead of the local-jar setup.

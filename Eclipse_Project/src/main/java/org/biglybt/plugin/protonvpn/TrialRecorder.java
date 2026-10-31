@@ -20,7 +20,8 @@ import java.util.TimeZone;
 final class TrialRecorder {
 
 	static final long MAX_BYTES = 1024 * 1024;
-	static final String HEADER = "timestamp_utc,log_kind,log_port,natpmp_kind,natpmp_tcp,natpmp_udp,outcome,tcp_udp_split,natpmp_rtt_ms,log_file_mtime_utc";
+	static final String HEADER = "timestamp_utc,log_kind,log_port,natpmp_kind,natpmp_tcp,natpmp_udp,outcome,tcp_udp_split,natpmp_rtt_ms,"
+			+ "natpmp_internal_port,natpmp_lifetime_s,natpmp_epoch_s,log_file_mtime_utc";
 
 	private final File file;
 
@@ -56,6 +57,9 @@ final class TrialRecorder {
 				+ ',' + eval.outcome
 				+ ',' + eval.tcpUdpSplit
 				+ ',' + (nat.hasPort() ? Long.toString(nat.elapsedMs) : "")
+				+ ',' + (nat.gatewayInternalPort >= 0 ? Integer.toString(nat.gatewayInternalPort) : "")
+				+ ',' + (nat.gatewayLifetimeSecs >= 0 ? Long.toString(nat.gatewayLifetimeSecs) : "")
+				+ ',' + (nat.gatewayEpochSecs >= 0 ? Long.toString(nat.gatewayEpochSecs) : "")
 				+ ',' + (log.sourceMtimeMs > 0 ? iso(log.sourceMtimeMs) : "");
 	}
 

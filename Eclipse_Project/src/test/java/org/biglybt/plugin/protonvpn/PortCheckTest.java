@@ -27,6 +27,7 @@ class PortCheckTest {
 	PortApplierTest.FakeCore core = new PortApplierTest.FakeCore(6881, 6881);
 	AtomicReference<PortResult> natReply = new AtomicReference<>();
 	AtomicInteger natQueries = new AtomicInteger();
+	AtomicReference<String> natRequest = new AtomicReference<>();
 	AtomicBoolean natEnabled = new AtomicBoolean(true);
 	AtomicReference<Status> lastStatus = new AtomicReference<>();
 	Map<String, Long> store = new HashMap<>();
@@ -50,8 +51,9 @@ class PortCheckTest {
 				store.put(key, value);
 			}
 		});
-		PortSource nat = () -> {
+		NatPmpProbe nat = (internal, external) -> {
 			natQueries.incrementAndGet();
+			natRequest.set(internal + "/" + external);
 			return natReply.get();
 		};
 		check = new PortCheck(logSource, nat, natEnabled::get, new PortApplier(core), tracker,
@@ -71,6 +73,7 @@ class PortCheckTest {
 		assertEquals(51234, core.udp);
 		assertTrue(rlog.messages.stream().anyMatch(m -> m.startsWith("INFO Incoming port changed: TCP 6881 -> 51234")), rlog.messages.toString());
 		assertEquals(1, tracker.count(ComparisonTracker.Outcome.MATCH));
+		assertEquals("51234/51234", natRequest.get(), "the trial asks about the app's mapping, not a new one");
 		Status s = lastStatus.get();
 		assertEquals(Integer.valueOf(51234), s.logPort);
 		assertEquals(51234, s.biglyTcp);
@@ -97,13 +100,14 @@ class PortCheckTest {
 	}
 
 	@Test
-	void missingPortIsWarnedOnceNotEveryCheck() {
+	void missingPortIsWarnedOnceNotEveryCheckAndTrialIsSkipped() {
 		natReply.set(PortResult.error("timeout", 0, null));
 		check.run("1");
 		check.run("2");
 		check.run("3");
 		assertEquals(1, rlog.count("WARN Proton VPN port not found"));
 		assertEquals(6881, core.tcp);
+		assertEquals(0, natQueries.get(), "no NAT-PMP request without a port to ask about");
 	}
 
 	@Test
@@ -111,6 +115,7 @@ class PortCheckTest {
 		writeLog("Port pair 99999->99999\n");
 		natReply.set(PortResult.error("timeout", 0, null));
 		check.run("test");
+		assertEquals(0, natQueries.get());
 		assertEquals(6881, core.tcp);
 		assertEquals(1, rlog.count("WARN Ignored port 99999"));
 		assertTrue(lastStatus.get().lastError.contains("99999"));

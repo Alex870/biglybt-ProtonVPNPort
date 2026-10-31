@@ -11,7 +11,7 @@ import java.util.function.LongSupplier;
 final class PortCheck {
 
 	private final LogFilePortSource logSource;
-	private final PortSource natPmpSource;
+	private final NatPmpProbe natPmp;
 	private final BooleanSupplier natPmpEnabled;
 	private final PortApplier applier;
 	private final ComparisonTracker tracker;
@@ -22,11 +22,11 @@ final class PortCheck {
 
 	private final Status status = new Status();
 
-	PortCheck(LogFilePortSource logSource, PortSource natPmpSource, BooleanSupplier natPmpEnabled,
+	PortCheck(LogFilePortSource logSource, NatPmpProbe natPmp, BooleanSupplier natPmpEnabled,
 			PortApplier applier, ComparisonTracker tracker, TrialRecorder recorder, Log log,
 			Status.Sink statusSink, LongSupplier clock) {
 		this.logSource = logSource;
-		this.natPmpSource = natPmpSource;
+		this.natPmp = natPmp;
 		this.natPmpEnabled = natPmpEnabled;
 		this.applier = applier;
 		this.tracker = tracker;
@@ -45,8 +45,14 @@ final class PortCheck {
 			handleLogResult(logResult, now);
 
 			if (natPmpEnabled.getAsBoolean()) {
-				PortResult natResult = natPmpSource.query();
-				handleTrial(logResult, natResult, now);
+				Integer logPort = logResult.port();
+				if (logPort != null && PortApplier.isValid(logPort)) {
+					// Ask about (and renew) the app's own mapping; see NatPmpPortSource.
+					PortResult natResult = natPmp.query(logPort, logPort);
+					handleTrial(logResult, natResult, now);
+				} else {
+					log.verbose("NAT-PMP trial skipped: no valid port in the log to ask the gateway about");
+				}
 			}
 		} catch (Throwable t) {
 			log.error("Unexpected error during port check", t);
